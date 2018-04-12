@@ -6,15 +6,16 @@ import gensim
 import time
 import os
 
-vocab_len = 1000
-num_epoch = 6
+vocab_len = 20000
+num_epoch = 1
 max_length = 30
 batch_size = 50
 embedding_dim = 100
 hidden_size = 512
 max_grad_norm = 5
-text_num = 1000  # for quick dry-run
+text_num = 200000  # for quick dry-run
 learing_rate = 0.1
+
 
 def load_data(path):
     f = open(path,'r')
@@ -95,98 +96,10 @@ def get_batch_data(data, batch_size):
     mask = np.reshape(mask[:num_batch*batch_size], [num_batch, batch_size])
     return data_x, data_y, mask
 
-
-train_path = "data/sentences.eval"
-data = load_data(train_path)
-word2id_dict, id2word_dict = build_dict(data,vocab_len=vocab_len)
-all_train_data = convert_text_data(data[:text_num], word2id_dict)
-data_x, data_y, mask = get_batch_data(all_train_data, batch_size=batch_size)
-embedding_path = "wordembeddings-dim100.word2vec"
-
-
-
-# Training
-sess = tf.Session()
-with sess.as_default():
-    model = RNNmodel(vocab_len=vocab_len,
-                     embedding_size=embedding_dim,
-                     hidden_size=hidden_size,
-                     sequency_length=max_length,
-                     batch_size=batch_size)
-
-    # define the training process
-    tvars = tf.trainable_variables()
-    grads, _ = tf.clip_by_global_norm(tf.gradients(model.loss, tvars), max_grad_norm)
-    optimizer = tf.train.AdamOptimizer(learning_rate=learing_rate)
-    global_step = tf.Variable(0, name="global_step", trainable=False)
-    train_op = optimizer.apply_gradients(zip(grads, tvars),
-        global_step=global_step)
-    sess.run(tf.global_variables_initializer())
-
-    #  add summary
-    grad_summaries = []
-    for g, v in zip(grads,tvars):
-        if g is not None:
-            grad_hist_summary = tf.summary.histogram('/grad/hist/%s' % v.name, g)
-            grad_summaries.append(grad_hist_summary)
-    grad_summaries_merged = tf.summary.merge(grad_summaries)
-
-    # set the output dir
-    timestamp = str(int(time.time()))
-    out_dir = os.path.abspath(os.path.join(os.path.curdir,'run', timestamp))
-    print("write to {}\n".format(out_dir))
-
-    # summary for the loss
-    loss_summary = tf.summary.scalar("loss", model.loss)
-
-    # train_summary
-    train_summary_op = tf.summary.merge([loss_summary, grad_summaries_merged])
-    out_summary_dir = os.path.join(out_dir, "summary")
-    train_summary_writer = tf.summary.FileWriter(out_summary_dir,sess.graph)
-
-    # saver
-    checkpoint_dir = os.path.join(out_dir,"checkpoints")
-    if not os.path.exists(checkpoint_dir):
-        os.makedirs(checkpoint_dir)
-    saver = tf.train.Saver(tf.global_variables())
-
-    # load embedding
-    wordemb = gensim.models.KeyedVectors.load_word2vec_format(embedding_path,binary=False)
-    my_embedding_matrix = np.random.uniform(-0.25, 0.25, (vocab_len,embedding_dim))
-
-    for id, word in id2word_dict.items():
-        if word in wordemb.vocab:
-            my_embedding_matrix[id,:] = wordemb[word]
-        else:
-            my_embedding_matrix[id,:] = np.random.uniform(-0.25, 0.25,embedding_dim)
-
-    word_embedding = tf.placeholder(tf.float32,[None,None], name="pretrained_embeddings")
-    set_x = model.word_embeddings.assign(word_embedding)
-
-    sess.run(set_x, feed_dict={word_embedding:my_embedding_matrix})
-
-    epoch = 0
-    while epoch < num_epoch:
-        batch_loss = 0
-        for ibatch in range(data_x.shape[0]):
-             _, summary, step, loss = sess.run([train_op, train_summary_op, global_step, model.perplexity], feed_dict={model.input_x: data_x[ibatch,:,:],
-                                                                     model.input_y: data_y[ibatch,:,:],
-                                                                     model.sequence_length_list: mask[ibatch,:]})
-             train_summary_writer.add_summary(summary=summary, global_step=step)
-             batch_loss += loss
-        print("ipoch", epoch, "loss", batch_loss/data_x.shape[0])
-        epoch += 1
-    saver.save(sess,checkpoint_dir,global_step=step)
-
 #
 # evaluation phase
-valid_path = "data/sentences.eval"
-data = load_data(valid_path)
-all_valid_data = convert_text_data(data, word2id_dict)
-data_x, data_y, sequemce_mask = all_valid_data
-
-
-def evaluate(sess_path, sentence, target, length_list, my_embedding_matrix):
+def evaluate(sess_path, data_x, data_y, length_list,result_ptr):
+    n_batch = len(data_x)
     sess = tf.Session()
     graph_name = sess_path + '.meta'
     saver = tf.train.import_meta_graph(graph_name)
@@ -194,21 +107,126 @@ def evaluate(sess_path, sentence, target, length_list, my_embedding_matrix):
     graph = tf.get_default_graph()
 
     # get ops
-    perplexity = graph.get_tensor_by_name("perplexity:0")
+    perplexity = graph.get_tensor_by_name("eva_perplexity:0")
     input_x = graph.get_tensor_by_name("input_x:0")
     input_y = graph.get_tensor_by_name("input_y:0")
     sequence_length_list = graph.get_tensor_by_name("sequence_length_list:0")
 
-    this_perplexity = sess.run(perplexity, feed_dict={input_x:data_x[:50],
-                                            input_y:data_y[:50],
-                                            sequence_length_list:sequemce_mask[:50]})
+    for ibatch in range(n_batch):
+        this_perplexity = sess.run(perplexity, feed_dict={input_x: data_x[ibatch],
+                                                          input_y: data_y[ibatch],
+                                                          sequence_length_list: length_list[ibatch]})
+        for i_per in this_perplexity:
+            result_ptr.write(str(i_per)+'\n')
 
-    return perplexity
+
 
 def predict(sess, sentence, mask, model):
-    pred_id = sess.run(model.prediction, feed_dict={model.input:sentence})
+    pred_id = sess.run(model.prediction, feed_dict={model.input: sentence})
     next_word_id = pred_id[mask]
     next_word = id2word(next_word_id)
 
     return next_word
+
+if __name__ == '__main__':
+
+    train_path = "data/sentences.train"
+    train_text = load_data(train_path)
+    word2id_dict, id2word_dict = build_dict(train_text,vocab_len=vocab_len)
+    train_data = convert_text_data(train_text[:text_num], word2id_dict)
+    data_x, data_y, mask = get_batch_data(train_data, batch_size=batch_size)
+    embedding_path = "wordembeddings-dim100.word2vec"
+
+    # Training
+    sess = tf.Session()
+    with sess.as_default():
+        model = RNNmodel(vocab_len=vocab_len,
+                         embedding_size=embedding_dim,
+                         hidden_size=hidden_size,
+                         sequency_length=max_length,
+                         batch_size=batch_size)
+
+        # define the training process
+        tvars = tf.trainable_variables()
+        grads, _ = tf.clip_by_global_norm(tf.gradients(model.minimize_loss, tvars), max_grad_norm)
+        optimizer = tf.train.AdamOptimizer(learning_rate=learing_rate)
+        global_step = tf.Variable(0, name="global_step", trainable=False)
+        train_op = optimizer.apply_gradients(zip(grads, tvars),
+            global_step=global_step)
+        sess.run(tf.global_variables_initializer())
+
+        #  add summary
+        grad_summaries = []
+        for g, v in zip(grads,tvars):
+            if g is not None:
+                grad_hist_summary = tf.summary.histogram('/grad/hist/%s' % v.name, g)
+                grad_summaries.append(grad_hist_summary)
+        grad_summaries_merged = tf.summary.merge(grad_summaries)
+
+        # set the output dir
+        timestamp = str(int(time.time()))
+        out_dir = os.path.abspath(os.path.join(os.path.curdir, 'run', timestamp))
+        print("write to {}\n".format(out_dir))
+
+        # summary for the loss
+        loss_summary = tf.summary.scalar("print_perplexity", model.print_perplexity)
+
+        # train_summary
+        train_summary_op = tf.summary.merge([loss_summary, grad_summaries_merged])
+        out_summary_dir = os.path.join(out_dir, "summary")
+        train_summary_writer = tf.summary.FileWriter(out_summary_dir,sess.graph)
+
+        # saver
+        checkpoint_dir = os.path.join(out_dir,"checkpoints")
+        if not os.path.exists(checkpoint_dir):
+            os.makedirs(checkpoint_dir)
+        saver = tf.train.Saver(tf.global_variables())
+
+        # load embedding
+        wordemb = gensim.models.KeyedVectors.load_word2vec_format(embedding_path,binary=False)
+        my_embedding_matrix = np.random.uniform(-0.25, 0.25, (vocab_len,embedding_dim))
+
+        for id, word in id2word_dict.items():
+            if word in wordemb.vocab:
+                my_embedding_matrix[id,:] = wordemb[word]
+            else:
+                my_embedding_matrix[id,:] = np.random.uniform(-0.25, 0.25,embedding_dim)
+
+        word_embedding = tf.placeholder(tf.float32,[None,None], name="pretrained_embeddings")
+        set_x = model.word_embeddings.assign(word_embedding)
+
+        sess.run(set_x, feed_dict={word_embedding:my_embedding_matrix})
+
+        epoch = 0
+        while epoch < num_epoch:
+            batch_loss = 0
+            for ibatch in range(data_x.shape[0]):
+                 _, summary, step, loss = sess.run([train_op, train_summary_op, global_step, model.print_perplexity], feed_dict={model.input_x: data_x[ibatch,:,:],
+                                                                         model.input_y: data_y[ibatch,:,:],
+                                                                         model.sequence_length_list: mask[ibatch,:]})
+                 train_summary_writer.add_summary(summary=summary, global_step=step)
+                 batch_loss += loss
+                 print(step, loss)
+            print("ipoch", epoch, "loss", batch_loss/data_x.shape[0])
+            epoch += 1
+        saver.save(sess,checkpoint_dir,global_step=step)
+
+
+
+    valid_path = "data/sentences.eval"
+    valid_text = load_data(valid_path)
+    all_valid_data = convert_text_data(valid_text, word2id_dict)
+    vdata_x, vdata_y, vsequence_mask = get_batch_data(all_valid_data, batch_size=batch_size)
+    result_path = '/Users/jiayu/PycharmProjects/NLU/run/1523433517'
+    sess_path = os.path.join(result_path,'checkpoints-120')
+    pepfile_path = os.path.join(result_path,'result.txt')
+    result_ptr = open(pepfile_path, 'w')
+
+    evaluate(sess_path=sess_path,
+             data_x=vdata_x,
+             data_y=vdata_y,
+             length_list=vsequence_mask,
+             result_ptr=result_ptr)
+
+
 
