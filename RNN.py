@@ -21,25 +21,24 @@ class RNNmodel():
         # split by the timestamp
         self.embedded_tokens = tf.unstack(self.embedded_tokens, num=self.sequence_length, axis=1)
         # rnncell = tf.nn.rnn_cell.BasicRNNCell(num_units=self.hidden_size)
-        if is_add_layer:
-            rnncell = tf.nn.rnn_cell.LSTMCell(num_units=2*self.hidden_size)
-            W_middle = tf.get_variable("W_middle",shape=[2*self.hidden_size,hidden_size],
-                                    initializer=tf.contrib.layers.xavier_initializer())
-        else:
-            rnncell = tf.nn.rnn_cell.LSTMCell(num_units=self.hidden_size)
+        with tf.variable_scope("rnn"):
+            if is_add_layer:
+                rnncell = tf.nn.rnn_cell.LSTMCell(num_units=2*self.hidden_size)
+                W_middle = tf.get_variable("W_middle", shape=[2 * self.hidden_size, hidden_size],
+                                           initializer=tf.contrib.layers.xavier_initializer())
+            else:
+                rnncell = tf.nn.rnn_cell.LSTMCell(num_units=2*self.hidden_size)
+            state = rnncell.zero_state(batch_size=self.batch_size, dtype=tf.float32)
+            outputs = []
+            for _input in self.embedded_tokens:
+                output,state = rnncell(_input,state)
+                outputs.append(output)
 
-        # outputs, state = tf.nn.static_rnn(rnncell, self.embedded_tokens,dtype=tf.float32)
-        state = rnncell.zero_state(batch_size=self.batch_size, dtype=tf.float32)
-        outputs = []
-        for _input in self.embedded_tokens:
-            output,state = rnncell(_input,state)
-            outputs.append(output)
-
         if is_add_layer:
-            self.outputs = tf.reshape(outputs,[-1,2*hidden_size])  # shape: (batch_size*time_step, hidden_size)
-            self.outputs=tf.matmul(self.outputs,W_middle)
+            outputs = tf.reshape(outputs,[-1,2*hidden_size])
+            self.outputs = tf.matmul(outputs,W_middle)
         else:
-            self.outputs = tf.reshape(outputs,[-1,hidden_size])
+            self.outputs = tf.reshape(outputs,[-1,hidden_size])  # shape: (batch_size*time_step, hidden_size)
         self.W_out = tf.get_variable("W_out", shape=[self.hidden_size, self.vocab_len],
                                 initializer=tf.contrib.layers.xavier_initializer())
         self.b_out = tf.Variable(tf.constant(0.1, shape=[self.vocab_len,]), name='b_out')
@@ -58,5 +57,3 @@ class RNNmodel():
         self.eva_perplexity = tf.exp(self.loss, name="eva_perplexity")
         self.minimize_loss = tf.reduce_mean(self.loss,name="minize_loss")
         self.print_perplexity = tf.exp(self.minimize_loss,name="print_perplexity")
-
-
