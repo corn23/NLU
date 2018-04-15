@@ -2,7 +2,7 @@ import tensorflow as tf
 
 
 class RNNmodel():
-    def __init__(self,embedding_size, sequency_length, hidden_size, vocab_len, batch_size):
+    def __init__(self,embedding_size, sequency_length, hidden_size, vocab_len, batch_size, is_add_layer):
 
         self.embedding_size = embedding_size
         self.sequence_length = sequency_length
@@ -21,7 +21,12 @@ class RNNmodel():
         # split by the timestamp
         self.embedded_tokens = tf.unstack(self.embedded_tokens, num=self.sequence_length, axis=1)
         # rnncell = tf.nn.rnn_cell.BasicRNNCell(num_units=self.hidden_size)
-        rnncell = tf.nn.rnn_cell.LSTMCell(num_units=self.hidden_size)
+        if is_add_layer:
+            rnncell = tf.nn.rnn_cell.LSTMCell(num_units=2*self.hidden_size)
+            W_middle = tf.get_variable("W_middle",shape=[2*self.hidden_size,hidden_size],
+                                    initializer=tf.contrib.layers.xavier_initializer())
+        else:
+            rnncell = tf.nn.rnn_cell.LSTMCell(num_units=self.hidden_size)
 
         # outputs, state = tf.nn.static_rnn(rnncell, self.embedded_tokens,dtype=tf.float32)
         state = rnncell.zero_state(batch_size=self.batch_size, dtype=tf.float32)
@@ -30,7 +35,11 @@ class RNNmodel():
             output,state = rnncell(_input,state)
             outputs.append(output)
 
-        self.outputs = tf.reshape(outputs,[-1,hidden_size])  # shape: (batch_size*time_step, hidden_size)
+        if is_add_layer:
+            self.outputs = tf.reshape(outputs,[-1,2*hidden_size])  # shape: (batch_size*time_step, hidden_size)
+            self.outputs=tf.matmul(self.outputs,W_middle)
+        else:
+            self.outputs = tf.reshape(outputs,[-1,hidden_size])
         self.W_out = tf.get_variable("W_out", shape=[self.hidden_size, self.vocab_len],
                                 initializer=tf.contrib.layers.xavier_initializer())
         self.b_out = tf.Variable(tf.constant(0.1, shape=[self.vocab_len,]), name='b_out')

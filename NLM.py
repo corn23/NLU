@@ -5,23 +5,32 @@ from RNN import RNNmodel
 import gensim
 import time
 import os
+import glob
+import sys
 
 vocab_len = 20000
-num_epoch = 1
-max_length = 30
+num_epoch = 4
+max_length = 32
 batch_size = 50
 embedding_dim = 100
 hidden_size = 512
 max_grad_norm = 5
 text_num = 200000  # for quick dry-run
-learing_rate = 0.1
+learning_rate = 0.01
+is_use_embedding = False
+is_add_layer = False
 
+print("vocab_len:{} num_epch:{} text_num:{} learning_rate:{}".format(
+vocab_len, num_epoch,text_num,learning_rate))
+print("is_use_embedding",is_use_embedding)
+print("is_add_layer",is_add_layer)
 
 def load_data(path):
     f = open(path,'r')
     data = []
     for line in f:
-        data.append(line.split(' ')[:-1])
+        token = line.strip().split(' ')
+        data.append(token)
     f.close()
     return data
 
@@ -34,7 +43,6 @@ def build_dict(data, vocab_len):
     all_word  = []
     for sentence in data:
         all_word.extend(sentence)
-
     pre_vocab = word_counter(all_word).most_common(vocab_len-4)
     # add <pad> <unk> <bos> <eos>
     pre_vocab_list = [word[0] for word in pre_vocab]
@@ -62,8 +70,8 @@ def id2word(IDlist,id2word_dict):
     return [id2word_dict[id] for id in IDlist]
 
 def add_special_string(IDlist, max_length):
-    if len(IDlist) > 28:
-        IDlist = IDlist[:28]
+    if len(IDlist) > max_length-2:
+        IDlist = IDlist[:max_length-2]
     a = [2]  # <bos>
     a.extend(IDlist)
     a.append(3)  # <eos>
@@ -101,9 +109,10 @@ def get_batch_data(data, batch_size):
 def evaluate(sess_path, data_x, data_y, length_list,result_ptr):
     n_batch = len(data_x)
     sess = tf.Session()
-    graph_name = sess_path + '.meta'
-    saver = tf.train.import_meta_graph(graph_name)
-    saver.restore(sess, sess_path)
+    graph_path = os.path.join(sess_path,'*.meta')
+    graph_name = glob.glob(graph_path)
+    saver = tf.train.import_meta_graph(graph_name[0])
+    saver.restore(sess, graph_name[0].split('.')[0])
     graph = tf.get_default_graph()
 
     # get ops
@@ -144,12 +153,13 @@ if __name__ == '__main__':
                          embedding_size=embedding_dim,
                          hidden_size=hidden_size,
                          sequency_length=max_length,
-                         batch_size=batch_size)
+                         batch_size=batch_size,
+                         is_add_layer=is_add_layer)
 
         # define the training process
         tvars = tf.trainable_variables()
         grads, _ = tf.clip_by_global_norm(tf.gradients(model.minimize_loss, tvars), max_grad_norm)
-        optimizer = tf.train.AdamOptimizer(learning_rate=learing_rate)
+        optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
         global_step = tf.Variable(0, name="global_step", trainable=False)
         train_op = optimizer.apply_gradients(zip(grads, tvars),
             global_step=global_step)
@@ -166,7 +176,7 @@ if __name__ == '__main__':
         # set the output dir
         timestamp = str(int(time.time()))
         out_dir = os.path.abspath(os.path.join(os.path.curdir, 'run', timestamp))
-        print("write to {}\n".format(out_dir))
+        print("write to {}\n".format(out_dir),flush=True)
 
         # summary for the loss
         loss_summary = tf.summary.scalar("print_perplexity", model.print_perplexity)
@@ -185,12 +195,12 @@ if __name__ == '__main__':
         # load embedding
         wordemb = gensim.models.KeyedVectors.load_word2vec_format(embedding_path,binary=False)
         my_embedding_matrix = np.random.uniform(-0.25, 0.25, (vocab_len,embedding_dim))
-
-        for id, word in id2word_dict.items():
-            if word in wordemb.vocab:
-                my_embedding_matrix[id,:] = wordemb[word]
-            else:
-                my_embedding_matrix[id,:] = np.random.uniform(-0.25, 0.25,embedding_dim)
+        if is_use_embedding:
+            for id, word in id2word_dict.items():
+                if word in wordemb.vocab:
+                    my_embedding_matrix[id,:] = wordemb[word]
+                else:
+                    my_embedding_matrix[id,:] = np.random.uniform(-0.25, 0.25,embedding_dim)
 
         word_embedding = tf.placeholder(tf.float32,[None,None], name="pretrained_embeddings")
         set_x = model.word_embeddings.assign(word_embedding)
@@ -201,13 +211,14 @@ if __name__ == '__main__':
         while epoch < num_epoch:
             batch_loss = 0
             for ibatch in range(data_x.shape[0]):
-                 _, summary, step, loss = sess.run([train_op, train_summary_op, global_step, model.print_perplexity], feed_dict={model.input_x: data_x[ibatch,:,:],
+                _, summary, step, loss = sess.run([train_op, train_summary_op, global_step, model.print_perplexity], feed_dict={model.input_x: data_x[ibatch,:,:],
                                                                          model.input_y: data_y[ibatch,:,:],
                                                                          model.sequence_length_list: mask[ibatch,:]})
-                 train_summary_writer.add_summary(summary=summary, global_step=step)
-                 batch_loss += loss
-                 print(step, loss)
+                train_summary_writer.add_summary(summary=summary, global_step=step)
+                batch_loss += loss
+                print(ibatch,loss,flush=True)
             print("ipoch", epoch, "loss", batch_loss/data_x.shape[0])
+            sys.stdout.flush()
             epoch += 1
         saver.save(sess,checkpoint_dir,global_step=step)
 
@@ -217,12 +228,11 @@ if __name__ == '__main__':
     valid_text = load_data(valid_path)
     all_valid_data = convert_text_data(valid_text, word2id_dict)
     vdata_x, vdata_y, vsequence_mask = get_batch_data(all_valid_data, batch_size=batch_size)
-    result_path = '/Users/jiayu/PycharmProjects/NLU/run/1523433517'
-    sess_path = os.path.join(result_path,'checkpoints-120')
+    result_path = out_dir 
     pepfile_path = os.path.join(result_path,'result.txt')
     result_ptr = open(pepfile_path, 'w')
 
-    evaluate(sess_path=sess_path,
+    evaluate(sess_path=result_path,
              data_x=vdata_x,
              data_y=vdata_y,
              length_list=vsequence_mask,
