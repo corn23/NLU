@@ -27,7 +27,7 @@ class RNNmodel():
                 W_middle = tf.get_variable("W_middle", shape=[2 * self.hidden_size, hidden_size],
                                            initializer=tf.contrib.layers.xavier_initializer())
             else:
-                rnncell = tf.nn.rnn_cell.LSTMCell(num_units=2*self.hidden_size)
+                rnncell = tf.nn.rnn_cell.LSTMCell(num_units=self.hidden_size)
             state = rnncell.zero_state(batch_size=self.batch_size, dtype=tf.float32)
             outputs = []
             for _input in self.embedded_tokens:

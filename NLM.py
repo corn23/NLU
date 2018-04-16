@@ -10,17 +10,17 @@ import sys
 
 
 vocab_len = 20000
-num_epoch = 1
+num_epoch = 6
 max_length = 30
 batch_size = 50
 embedding_dim = 100
 hidden_size = 512
 max_grad_norm = 5
-text_num = 100  # for quick dry-run
+text_num = 200000  # for quick dry-run
 learning_rate = 0.01
 embedding_path = "wordembeddings-dim100.word2vec"
-is_add_layer = True
-is_use_embedding = True
+is_add_layer = False
+is_use_embedding = False
 
 
 print("vocab_len:{} num_epch:{} text_num:{} learning_rate:{}".format(
@@ -174,7 +174,7 @@ def train(model, learning_rate=0.01, is_use_embedding=True,
                                                                          model.input_y: data_y[ibatch,:,:],
                                                                          model.sequence_length_list: mask[ibatch,:]})
                  train_summary_writer.add_summary(summary=summary, global_step=step)
-                 print(ibatch, loss)
+                 print(ibatch, loss,flush=True)
                  batch_loss += loss
             print("ipoch", epoch, "loss", batch_loss/data_x.shape[0])
             sys.stdout.flush()
