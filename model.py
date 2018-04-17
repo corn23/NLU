@@ -117,10 +117,10 @@ def evaluate(sess_path, eva_data, result_ptr):
     sequence_length_list = graph.get_tensor_by_name("sequence_length_list:0")
 
     for ibatch in range(n_batch):
-        this_perplexity = sess.run(perplexity, feed_dict={input_x: data_x[ibatch],
-                                                          input_y: data_y[ibatch],
-                                                          sequence_length_list: length_list[ibatch]})
-        print(np.max(this_perplexity),np.argmax(this_perplexity),flush=True)
+        this_perplexity = sess.run(perplexity, feed_dict={input_x: data_x[ibatch,:,:],
+                                                          input_y: data_y[ibatch,:,:],
+                                                          sequence_length_list: length_list[ibatch,:]})
+        print(np.mean(this_perplexity),np.max(this_perplexity),flush=True)
         for i_per in this_perplexity:
             result_ptr.write(str(i_per)+'\n')
 

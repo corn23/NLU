@@ -56,4 +56,4 @@ class RNNmodel():
 
         self.eva_perplexity = tf.exp(self.loss, name="eva_perplexity")
         self.minimize_loss = tf.reduce_mean(self.loss,name="minize_loss")
-        self.print_perplexity = tf.exp(self.minimize_loss,name="print_perplexity")
+        self.print_perplexity = tf.reduce_mean(self.eva_perplexity, name="print_perplexity")
