@@ -133,9 +133,11 @@ def generate(sess_path, cfg, contin_data,result_ptr,id2word_dict):
     is_add_layer = cfg['is_add_layer']
     max_generate_length = cfg['max_generate_length']
     batch_size = cfg['batch_size']
+    max_length = cfg['max_length']
+
     contin_data,_,length_list = contin_data
-    contin_data = np.squeeze(contin_data, axis=1)  #we process sentence one by one
-    length_list = np.squeeze(length_list, axis=1)
+    # contin_data = np.squeeze(contin_data, axis=1)  #we process sentence one by one
+    # length_list = np.squeeze(length_list, axis=1)
     sess = tf.Session()
     graph_path = os.path.join(sess_path,'*.meta')
     graph_name = glob.glob(graph_path)
@@ -147,9 +149,10 @@ def generate(sess_path, cfg, contin_data,result_ptr,id2word_dict):
     else:
         rnncell = tf.nn.rnn_cell.LSTMCell(num_units=hidden_size)
 
-    state=rnncell.zero_state(batch_size=1,dtype=tf.float32)
+    state=rnncell.zero_state(batch_size=batch_size,dtype=tf.float32)
+    init_input = tf.constant(0,shape=(batch_size,embedding_dim),dtype=tf.float32)
     with tf.variable_scope('rnn'):
-        rnncell(tf.gather_nd(word_embeddings,[[0]]),state) # for create rnn kerner/ bias for parameter load
+        rnncell(init_input,state) # for create rnn kerner/ bias for parameter load
 
     W_out = tf.get_variable("W_out", shape=[hidden_size, vocab_len],
                                  initializer=tf.contrib.layers.xavier_initializer())
@@ -160,28 +163,46 @@ def generate(sess_path, cfg, contin_data,result_ptr,id2word_dict):
     saver.restore(sess,ckpt_name)
     sentence_id = 0
     for sentence_id_list,L in zip(contin_data,length_list):
-        state = rnncell.zero_state(batch_size=1, dtype=tf.float32)
+        state = rnncell.zero_state(batch_size=batch_size, dtype=tf.float32)
+        output_list = []
+        state_list = []
 
-        for i in range(L):
-            wordvec = tf.gather_nd(word_embeddings, [[sentence_id_list[i]]])
-            output, state = rnncell(wordvec, state)
+        # lookup
+        embedded_tokens = tf.nn.embedding_lookup(word_embeddings, sentence_id_list)
+        # split by the timestamp
+        embedded_tokens = tf.unstack(embedded_tokens, num=max_length, axis=1)
 
-        generate_length = 0
-        for i in range(L, max_generate_length):
-            if is_add_layer:
-                middle_output = tf.matmul(output,W_middle)
-                final_output = tf.add(tf.matmul(middle_output, W_out),b_out)
-                word_id = sess.run(tf.argmax(final_output,axis=1))
-            else:
-                word_id = sess.run(tf.argmax(tf.add(tf.matmul(output, W_out),b_out),axis=1))
-            sentence_id_list[i]=word_id[0]
-            generate_length += 1
-            if word_id == 3: # <eos>
+        l = 0
+        L_max = np.max(L)
+        for _input in embedded_tokens:
+            output, state = rnncell(_input, state)
+            output_list.append(output)
+            state_list.append(state)
+            l += 1
+            if l > L_max:
                 break
-            input = tf.nn.embedding_lookup(word_embeddings,word_id)
-            output,state = rnncell(input,state)
 
-        sentence = id2word(sentence_id_list,id2word_dict)
-        print (sentence_id, ' '.join(sentence[:L+generate_length]),flush=True)
-        result_ptr.write(' '.join(sentence[:L+generate_length])+'\n')
-        sentence_id += 1
+        for idx,iL in enumerate(L):
+            generate_length = 0
+            output = tf.gather_nd(output_list[iL], [[idx]])
+            c_all,h_all = state_list[iL]
+            c = tf.gather_nd(c_all, [[idx]])
+            h = tf.gather_nd(h_all,[[idx]])
+            state = (c,h)
+            for i in range(iL, max_generate_length):
+                if is_add_layer:
+                    middle_output = tf.matmul(output,W_middle)
+                    final_output = tf.add(tf.matmul(middle_output, W_out),b_out)
+                    word_id = sess.run(tf.argmax(final_output,axis=1))
+                else:
+                    word_id = sess.run(tf.argmax(tf.add(tf.matmul(output, W_out),b_out),axis=1))
+                sentence_id_list[idx][i]=word_id[0]
+                generate_length += 1
+                if word_id[0] == 3: # <eos>
+                    break
+                input = tf.nn.embedding_lookup(word_embeddings,word_id)
+                output,state = rnncell(input,state)
+            sentence = id2word(sentence_id_list[idx],id2word_dict)
+            print (sentence_id, ' '.join(sentence[:iL+generate_length]),flush=True)
+            result_ptr.write(' '.join(sentence[:iL+generate_length])+'\n')
+            sentence_id += 1

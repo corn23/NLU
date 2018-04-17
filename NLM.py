@@ -17,6 +17,13 @@ print("vocab_len:{} num_epch:{} text_num:{} learning_rate:{}".format(
 cfg['vocab_len'], cfg['num_epoch'],cfg['text_num'],cfg['learning_rate']))
 print("is_use_embedding",cfg['is_use_embedding'])
 print("is_add_layer",cfg['is_add_layer'])
+# cfg = {}
+# cfg['t'] = 0
+# cfg['e'] = 0
+# cfg['g'] = 1
+# cfg['sess_path'] = '/Users/jiayu/PycharmProjects/NLU/run/1523829796'
+# cfg['batch_size'] = 50
+# cfg['max_length'] = 30
 
 # load dict
 with open('word2id_dict.pkl', 'rb') as f:
@@ -77,7 +84,7 @@ if cfg['g']:
     contin_path = "data/sentences.continuation"
     contin_text = load_data(contin_path)
     contin_batch_data = get_batch_data(contin_text, word2id_dict=word2id_dict,
-                                        batch_size=1, max_length=cfg['max_length'])
+                                        batch_size=cfg['batch_size'], max_length=cfg['max_length'])
     pepfile_path = os.path.join(result_path,'continuation.txt')
     result_ptr = open(pepfile_path, 'w')
 
