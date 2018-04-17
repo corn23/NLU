@@ -86,14 +86,15 @@ def train(model,cfg,train_data=None,id2word_dict=None):
                                                              model.input_y: data_y[ibatch,:,:],
                                                              model.sequence_length_list: mask[ibatch,:]})
                 train_summary_writer.add_summary(summary=summary, global_step=step)
-                print(ibatch, loss,flush=True)
+                print(ibatch, np.max(loss),flush=True)
                 batch_loss += loss
                 if ibatch%10 == 0:
                     valid_loss = sess.run([model.print_perplexity], feed_dict={model.input_x: data_x[-1, :, :],
                                                       model.input_y: data_y[-1, :, :],
                                                       model.sequence_length_list: mask[-1, :]})
                     print("ibatch", ibatch, "valid_loss",valid_loss,flush=True)
-            print("ipoch", epoch, "loss", batch_loss/data_x.shape[0])
+                    print("ibatch",ibatch,"train_loss",batch_loss/10,flush=True)
+                    batch_loss=0
             sys.stdout.flush()
             epoch += 1
         saver.save(sess,checkpoint_dir,global_step=step)
