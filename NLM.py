@@ -16,20 +16,12 @@ batch_size = 50
 embedding_dim = 100
 hidden_size = 512
 max_grad_norm = 5
-<<<<<<< HEAD
 max_generate_length=20
 text_num = 100  # for quick dry-run
 learning_rate = 0.01
 embedding_path = "wordembeddings-dim100.word2vec"
 is_add_layer = False
 is_use_embedding = True
-=======
-text_num = 200000  # for quick dry-run
-learning_rate = 0.01
-embedding_path = "wordembeddings-dim100.word2vec"
-is_add_layer = False
-is_use_embedding = False
->>>>>>> 5cadfab05006bbfb8d05d9bc6571c5aa3a9b218e
 
 
 print("vocab_len:{} num_epch:{} text_num:{} learning_rate:{}".format(
@@ -183,11 +175,7 @@ def train(model, learning_rate=0.01, is_use_embedding=True,
                                                                          model.input_y: data_y[ibatch,:,:],
                                                                          model.sequence_length_list: mask[ibatch,:]})
                  train_summary_writer.add_summary(summary=summary, global_step=step)
-<<<<<<< HEAD
-                 print(ibatch, loss)
-=======
                  print(ibatch, loss,flush=True)
->>>>>>> 5cadfab05006bbfb8d05d9bc6571c5aa3a9b218e
                  batch_loss += loss
             print("ipoch", epoch, "loss", batch_loss/data_x.shape[0])
             sys.stdout.flush()
@@ -219,11 +207,7 @@ def evaluate(sess_path, eva_data, result_ptr):
             result_ptr.write(str(i_per)+'\n')
 
 
-<<<<<<< HEAD
 def generate(sess_path, data_x, length_list, result_ptr,is_add_layer, max_generate_length):
-=======
-def generate(sess_path, data_x, length_list, result_ptr,is_add_layer):
->>>>>>> 5cadfab05006bbfb8d05d9bc6571c5aa3a9b218e
     data_x = np.squeeze(data_x, axis=1)  #we process sentence one by one
     length_list = np.squeeze(length_list, axis=1)
     sess = tf.Session()
@@ -257,11 +241,7 @@ def generate(sess_path, data_x, length_list, result_ptr,is_add_layer):
             output, state = rnncell(wordvec, state)
 
         generate_length = 0
-<<<<<<< HEAD
         for i in range(L, max_generate_length):
-=======
-        for i in range(L, max_length):
->>>>>>> 5cadfab05006bbfb8d05d9bc6571c5aa3a9b218e
             if is_add_layer:
                 middle_output = tf.matmul(output,W_middle)
                 final_output = tf.add(tf.matmul(middle_output, W_out),b_out)
