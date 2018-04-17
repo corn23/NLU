@@ -28,8 +28,7 @@ for item in word2id_dict.items():
 if cfg['t']:
     train_path = "data/sentences.train"
     train_text = load_data(train_path)
-    word2id_dict, id2word_dict = build_dict(train_text,vocab_len=cfg['vocab_len'])
-    train_batch_data = get_batch_data(train_text, word2id_dict =word2id_dict,
+    train_batch_data = get_batch_data(train_text[:cfg['text_num']], word2id_dict=word2id_dict,
                                       batch_size=cfg['batch_size'], max_length=cfg['max_length'])
 
     model = RNNmodel(vocab_len=cfg['vocab_len'],

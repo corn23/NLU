@@ -23,6 +23,7 @@ def get_cfg():
     if len(sys.argv) < 3:
         print("no mode is specified, please at least choose one mode you among [-t, -e -g]")
         print("program will eixt")
+        parser.print_help()
         sys.exit(1)
 
     cfg['t'] = args.t

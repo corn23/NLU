@@ -43,10 +43,6 @@ def train(model,cfg,train_data=None,id2word_dict=None):
         out_dir = os.path.abspath(os.path.join(os.path.curdir, 'run', timestamp))
         print("write to {}\n".format(out_dir),flush=True)
 
-        with open(os.path.join(out_dir,'log.txt'),'w') as f:
-            for item in cfg.items():
-                f.write(item)
-                f.write('\n')
         # summary for the loss
         loss_summary = tf.summary.scalar("print_perplexity", model.print_perplexity)
 
@@ -61,6 +57,10 @@ def train(model,cfg,train_data=None,id2word_dict=None):
             os.makedirs(checkpoint_dir)
         saver = tf.train.Saver(tf.global_variables())
 
+        with open(os.path.join(out_dir,'log.txt'),'w') as f:
+            for item in cfg.items():
+                f.write(str(item))
+                f.write('\n')
         # load embedding
         wordemb = gensim.models.KeyedVectors.load_word2vec_format(embedding_path,binary=False)
         my_embedding_matrix = np.random.uniform(-0.25, 0.25, (vocab_len,embedding_dim))
