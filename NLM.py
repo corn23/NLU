@@ -10,14 +10,14 @@ import sys
 
 
 vocab_len = 20000
-num_epoch = 6
+num_epoch = 1
 max_length = 30
 batch_size = 50
 embedding_dim = 100
 hidden_size = 512
 max_grad_norm = 5
 max_generate_length=20
-text_num = 100  # for quick dry-run
+text_num = 200000  # for quick dry-run
 learning_rate = 0.01
 embedding_path = "wordembeddings-dim100.word2vec"
 is_add_layer = False
@@ -171,12 +171,18 @@ def train(model, learning_rate=0.01, is_use_embedding=True,
         while epoch < num_epoch:
             batch_loss = 0
             for ibatch in range(data_x.shape[0]):
-                 _, summary, step, loss = sess.run([train_op, train_summary_op, global_step, model.print_perplexity], feed_dict={model.input_x: data_x[ibatch,:,:],
-                                                                         model.input_y: data_y[ibatch,:,:],
-                                                                         model.sequence_length_list: mask[ibatch,:]})
-                 train_summary_writer.add_summary(summary=summary, global_step=step)
-                 print(ibatch, loss,flush=True)
-                 batch_loss += loss
+                _, summary, step, loss = sess.run([train_op, train_summary_op, global_step, model.print_perplexity],
+                                                    feed_dict={model.input_x: data_x[ibatch,:,:],
+                                                             model.input_y: data_y[ibatch,:,:],
+                                                             model.sequence_length_list: mask[ibatch,:]})
+                train_summary_writer.add_summary(summary=summary, global_step=step)
+                print(ibatch, loss,flush=True)
+                batch_loss += loss
+                if ibatch%10 == 0:
+                    valid_loss = sess.run([model.print_perplexity], feed_dict={model.input_x: data_x[-1, :, :],
+                                                      model.input_y: data_y[-1, :, :],
+                                                      model.sequence_length_list: mask[-1, :]})
+                    print("ibatch", ibatch, "valid_loss",valid_loss,flush=True)
             print("ipoch", epoch, "loss", batch_loss/data_x.shape[0])
             sys.stdout.flush()
             epoch += 1
@@ -263,6 +269,7 @@ if __name__ == '__main__':
 
     train_path = "data/sentences.train"
     train_text = load_data(train_path)
+
     word2id_dict, id2word_dict = build_dict(train_text,vocab_len=vocab_len)
     train_data = convert_text_data(train_text[:text_num], word2id_dict)
     train_batch_data = get_batch_data(train_data, batch_size=batch_size)
