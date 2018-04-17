@@ -310,11 +310,7 @@ if __name__ == '__main__':
              data_x=cdata_x,
              length_list=csequence_rnnmask,
              result_ptr=result_ptr,
-<<<<<<< HEAD
              is_add_layer=is_add_layer,
              max_generate_length=max_generate_length)
-=======
-             is_add_layer=is_add_layer)
->>>>>>> 5cadfab05006bbfb8d05d9bc6571c5aa3a9b218e
     print("generating phase completed")
 
