@@ -119,7 +119,7 @@ def evaluate(sess_path, eva_data, result_ptr):
         this_perplexity = sess.run(perplexity, feed_dict={input_x: data_x[ibatch],
                                                           input_y: data_y[ibatch],
                                                           sequence_length_list: length_list[ibatch]})
-        print(np.max(this_perplexity),np.argmax(this_perplexity))
+        print(np.max(this_perplexity),np.argmax(this_perplexity),flush=True)
         for i_per in this_perplexity:
             result_ptr.write(str(i_per)+'\n')
 
@@ -157,7 +157,7 @@ def generate(sess_path, cfg, contin_data,result_ptr,id2word_dict):
     saver = tf.train.Saver()
     ckpt_name = graph_name[0].split('.')[0]  # something like checkpoints-40
     saver.restore(sess,ckpt_name)
-
+    sentence_id = 0
     for sentence_id_list,L in zip(contin_data,length_list):
         state = rnncell.zero_state(batch_size=1, dtype=tf.float32)
 
@@ -181,5 +181,6 @@ def generate(sess_path, cfg, contin_data,result_ptr,id2word_dict):
             output,state = rnncell(input,state)
 
         sentence = id2word(sentence_id_list,id2word_dict)
-        print (' '.join(sentence[:L+generate_length]))
+        print (sentence_id, ' '.join(sentence[:L+generate_length]),flush=True)
         result_ptr.write(' '.join(sentence[:L+generate_length])+'\n')
+        sentence_id += 1

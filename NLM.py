@@ -44,7 +44,7 @@ if cfg['t']:
 
 
 if cfg['e']:
-    valid_path = "data/sentences.eval"
+    valid_path = "data/sentences.train"
     valid_text = load_data(valid_path)
     if not cfg['t']:
         if len(cfg['sess_path'])==0:
