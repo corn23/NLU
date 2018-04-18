@@ -14,6 +14,7 @@
  or evaluate mode or generate mode
  
 > `python NLM.py -e 1 -sess_path run/1523866215`
+
 > `python NLM.py -g 1 -sess_path run/1523866215`
 
  In these two modes, ```-sess_path``` parameter must be provided so that the program know which tensorflow model you want to use. ```run/1523866215``` will be generated automatically in **training** mode.
