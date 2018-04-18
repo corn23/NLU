@@ -12,6 +12,7 @@ def train(model,cfg,train_data=None,id2word_dict=None):
 
     learning_rate = cfg['learning_rate']
     is_use_embedding = cfg['is_use_embedding']
+    is_add_layer = cfg['is_add_layer']
     embedding_path = cfg['embedding_path']
     vocab_len = cfg['vocab_len']
     max_grad_norm = cfg['max_grad_norm']
@@ -40,7 +41,8 @@ def train(model,cfg,train_data=None,id2word_dict=None):
 
         # set the output dir
         timestamp = str(int(time.time()))
-        out_dir = os.path.abspath(os.path.join(os.path.curdir, 'run', timestamp))
+        out_dir = os.path.abspath(os.path.join(os.path.curdir, 'run', 
+                    timestamp+str(is_use_embedding)+str(is_add_layer)))
         print("write to {}\n".format(out_dir),flush=True)
 
         # summary for the loss
@@ -179,13 +181,13 @@ def generate(sess_path, cfg, contin_data,result_ptr,id2word_dict):
             output_list.append(output)
             state_list.append(state)
             l += 1
-            if l > L_max:
+            if l == L_max:
                 break
 
         for idx,iL in enumerate(L):
             generate_length = 0
-            output = tf.gather_nd(output_list[iL], [[idx]])
-            c_all,h_all = state_list[iL]
+            output = tf.gather_nd(output_list[iL-1], [[idx]])
+            c_all,h_all = state_list[iL-1]
             c = tf.gather_nd(c_all, [[idx]])
             h = tf.gather_nd(h_all,[[idx]])
             state = (c,h)
