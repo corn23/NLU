@@ -3,6 +3,7 @@
 - **NLM.py** main script. 
 - **RNN.py** define the LSTM graph
 - **model.py** define three scenario: **train -t**, **evaluate -e** and **generate -g**
+- **get_cfg.py** define all the configuration parameters.
 - **utils.py** data load functions
 
 #### quick-run command 
