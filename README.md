@@ -1,7 +1,30 @@
 ### Brief Intro
-Currently, all functions are in ```NLM.py```, where you can change some basic parameters. and tensorflow model is defined in ```RNN.py```.
+#### project structure
+- **NLM.py** main script. 
+- **RNN.py** define the LSTM graph
+- **model.py** define three scenario: **train -t**, **evaluate -e** and **generate -g**
+- **utils.py** data load functions
 
- Type ```python NLM.py``` and it will run. For the full train set (200,000), it will cost 2.5 hour per epoch if ```is_add_layer=False```, 3.2 hour if ```is_add_layer=True``` on **leonhard cluster**. 
+#### quick-run command 
+ must specify which scenario you want to implement (-t, -e or -g). Eg. training mode:
+ 
+>` python NLM.py -t 1`
+ 
+ or evaluate mode or generate mode
+ 
+> `python NLM.py -e 1 -sess_path run/1523866215`
+> `python NLM.py -g 1 -sess_path run/1523866215`
+
+ In these two modes, ```-sess_path``` parameter must be provided so that the program know which tensorflow model you want to use. ```run/1523866215``` will be generated automatically in **training** mode.
+ 
+#### more details
+There are more options you could choose for running.
+type `python NLM.py` for the help function.
+
+#### running time 
+On Leonhard cluster, if set `is_add_layer=False`, it will cost around **2.5 hour** per epoch (**200,000** training texts). If new layer is added, that number would be **3.5 hour**.
+
+Do a quick calculation before starting your jobs in cluster:).
 
 ### Future work
 
